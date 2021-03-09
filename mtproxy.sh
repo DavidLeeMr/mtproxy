@@ -179,7 +179,7 @@ config_mtp(){
    # config info
   public_ip=$(curl -s https://api.ip.sb/ip --ipv4)
   [ -z "$public_ip" ] && public_ip=$(curl -s ipinfo.io/ip --ipv4)
-  secret=$(head -c 16 /dev/urandom | xxd -ps)
+  secret="8c11fb4dabd0a019c405800b593cd311"
 
   # proxy tag
   while true
@@ -189,8 +189,8 @@ config_mtp(){
   echo -e "若没有,请联系 @MTProxybot 进一步创建你的TAG, 可能需要信息如下："
   echo -e "IP: ${public_ip}"
   echo -e "PORT: ${input_port}"
-  echo -e "SECRET(可以随便填): ${secret}"
-  read -p "(留空则跳过):" input_tag
+  echo -e "SECRET: ${secret}"
+  read -p "TAG(留空则跳过):" input_tag
   [ -z "${input_tag}" ] && input_tag=${default_tag}
   if [ -z "$input_tag" ] || [[ "$input_tag" =~ ^[A-Za-z0-9]{32}$ ]]; then
     echo
