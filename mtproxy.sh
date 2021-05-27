@@ -160,7 +160,7 @@ config_mtp(){
   # domain
   while true
   do
-  default_domain="cceclub.org"
+  default_domain="cceclub.site"
   echo -e "请输入一个需要伪装的域名："
   read -p "(默认域名: ${default_domain}):" input_domain
   [ -z "${input_domain}" ] && input_domain=${default_domain}
@@ -184,7 +184,7 @@ config_mtp(){
   # proxy tag
   while true
   do
-  default_tag="90a65736c8bc47755c3f8c4e4a766fbc"
+  default_tag="e3e216ac8ca1391571f8ff5e31ee640b"
   echo -e "请输入你需要推广的TAG："
   echo -e "若没有,请联系 @MTProxybot 进一步创建你的TAG, 可能需要信息如下："
   echo -e "IP: ${public_ip}"
