@@ -184,7 +184,7 @@ config_mtp(){
   # proxy tag
   while true
   do
-  default_tag="e3e216ac8ca1391571f8ff5e31ee640b"
+  default_tag="971e4e9a5855a19997506b3f893e625b"
   echo -e "请输入你需要推广的TAG："
   echo -e "若没有,请联系 @MTProxybot 进一步创建你的TAG, 可能需要信息如下："
   echo -e "IP: ${public_ip}"
