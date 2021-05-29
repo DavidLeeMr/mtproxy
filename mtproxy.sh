@@ -160,7 +160,7 @@ config_mtp(){
   # domain
   while true
   do
-  default_domain="cceclub.site"
+  default_domain="cceclub.org"
   echo -e "请输入一个需要伪装的域名："
   read -p "(默认域名: ${default_domain}):" input_domain
   [ -z "${input_domain}" ] && input_domain=${default_domain}
