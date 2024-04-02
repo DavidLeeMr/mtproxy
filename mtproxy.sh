@@ -333,7 +333,7 @@ do_config_mtp() {
 
     # domain
     while true; do
-        default_domain="azure.microsoft.com"
+        default_domain="cceclub.org"
         echo -e "请输入一个需要伪装的域名："
         read -p "(默认域名: ${default_domain}):" input_domain
         [ -z "${input_domain}" ] && input_domain=${default_domain}
@@ -351,7 +351,7 @@ do_config_mtp() {
 
     # config info
     public_ip=$(get_ip_public)
-    secret=$(gen_rand_hex 32)
+    secret="8c11fb4dabd0a019c405800b593cd311"
 
     # proxy tag
     while true; do
