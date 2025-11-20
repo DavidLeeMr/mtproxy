@@ -1,4 +1,8 @@
 #!/bin/bash
+# MTProto一键安装脚本，兼容Telegram 12.2+
+# Author: Mr.David<https://cceclubs.org> / Based on TelegramMessenger/MTProxy (fork from https://github.com/TelegramMessenger/MTProxy)
+# Features: 交互配置，默认值支持回车即用，兼容新版 Telegram (iOS 12.2+ / Desktop 6.3+)
+
 WORKDIR=$(dirname $(readlink -f $0))
 cd $WORKDIR
 pid_file=$WORKDIR/pid/pid_mtproxy
@@ -112,25 +116,7 @@ function build_mtproto() {
     mkdir build && cd build
 
     if [[ "1" == "$1" ]]; then
-         if [ -d 'MTProxy' ]; then
-            rm -rf 'MTProxy'
-        fi
-
-        git clone https://github.com/ellermister/MTProxyC --depth=1 MTProxy
-        cd MTProxy && make && cd objs/bin &&  chmod +x mtproto-proxy
-
-        if [ ! -f "./mtproto-proxy" ]; then
-            echo "mtproto-proxy 编译失败"
-            exit 1
-        fi
-
-        cp -f mtproto-proxy $WORKDIR
-        
-
-        # clean
-        rm -rf 'MTProxy'
-
-    elif [[ "2" == "$1" ]]; then
+        # 构建 mtg（默认）
         # golang
         local arch=$(get_architecture)
 
@@ -158,6 +144,26 @@ function build_mtproto() {
         fi
 
         cp -f mtg $WORKDIR && chmod +x $WORKDIR/mtg
+
+    elif [[ "2" == "$1" ]]; then
+        # 构建 C 语言官方版本
+         if [ -d 'MTProxy' ]; then
+            rm -rf 'MTProxy'
+        fi
+
+        git clone https://github.com/ellermister/MTProxyC --depth=1 MTProxy
+        cd MTProxy && make && cd objs/bin &&  chmod +x mtproto-proxy
+
+        if [ ! -f "./mtproto-proxy" ]; then
+            echo "mtproto-proxy 编译失败"
+            exit 1
+        fi
+
+        cp -f mtproto-proxy $WORKDIR
+        
+
+        # clean
+        rm -rf 'MTProxy'
     fi
 
     # clean
@@ -170,14 +176,15 @@ function get_mtg_provider() {
     source ./mtp_config
 
     local arch=$(get_architecture)
-    if [[ "$arch" != "amd64" && $provider -eq 1 ]]; then
-        provider=2
+    # 官方版本只支持 amd64，因此如果用户选了“2”，但系统不是 amd64，则自动切换到1
+    if [[ "$arch" != "amd64" && $provider -eq 2 ]]; then
+        provider=1
     fi
 
     if [ $provider -eq 1 ]; then
-        echo "mtproto-proxy"
-    elif [ $provider -eq 2 ]; then
         echo "mtg"
+    elif [ $provider -eq 2 ]; then
+        echo "mtproto-proxy"
     else
         echo "错误配置,请重新安装"
         exit 1
@@ -249,6 +256,7 @@ do_install() {
     mtg_provider=$(get_mtg_provider)
 
     if [[ "$mtg_provider" == "mtg" ]]; then
+        # 下载 mtg
         local arch=$(get_architecture)
         local mtg_url=https://github.com/9seconds/mtg/releases/download/v1.0.11/mtg-1.0.11-linux-$arch.tar.gz
         wget $mtg_url -O mtg.tar.gz
@@ -256,6 +264,7 @@ do_install() {
 
         [[ -f "./mtg" ]] && ./mtg && echo "Installed for mtg"
     else
+        # 官方版本
         wget https://github.com/ellermister/mtproxy/releases/download/v0.04/mtproto-proxy -O mtproto-proxy -q
         chmod +x mtproto-proxy
     fi
@@ -322,8 +331,8 @@ do_config_mtp() {
     while true; do
         default_provider=1
         echo -e "请输入要安装的程序版本"
-        echo -e "1. Telegram 官方版本 (C语言, 存在一些问题, 只支持 x86_64)"
-        echo -e "2. 9seconds 第三方版本(兼容性强)"
+        echo -e "1. 9seconds 第三方版本 (兼容性强，推荐)"
+        echo -e "2. Telegram 官方版本 (C语言，仅支持 x86_64，存在兼容问题)"
 
         if ! is_supported_official_version; then
             echo -e "\n[\033[33m提醒\033[0m] 你的系统不支持官方版本\n"
@@ -404,7 +413,7 @@ do_config_mtp() {
 
     # config info
     public_ip=$(get_ip_public)
-    secret=$(gen_rand_hex 32)
+    secret="8c11fb4dabd0a019c405800b593cd311"
 
     # proxy tag
     while true; do
@@ -518,24 +527,21 @@ daemon_mtp() {
 
     if is_running_mtp; then
         echo -e "提醒：\033[33mMTProxy已经运行，请勿重复运行!\033[0m"
-    else
-        do_kill_process
-        do_check_system_datetime_and_update
-
-        local command=$(get_run_command)
-        echo $command
-        while true
-        do
-            {
-                sleep 2
-                info_mtp "ingore"
-            } &
-            $command >/dev/null 2>&1
-            echo "进程检测到被关闭,正在重启中!!!"
-            sleep 2
-        done
+        exit 0
     fi
+
+    do_kill_process
+    do_check_system_datetime_and_update
+
+    local command=$(get_run_command)
+    echo "启动 MTProxy 守护进程..."
+    echo $command
+
+    # 前台运行，不要使用 &
+    # 使用 bash -c 解析字符串命令
+    exec bash -c "$command"
 }
+
 
 debug_mtp() {
     cd $WORKDIR
@@ -553,11 +559,22 @@ debug_mtp() {
 }
 
 stop_mtp() {
+    if [ ! -f "$pid_file" ]; then
+        echo "PID 文件不存在, 无需停止"
+        return
+    fi
+
     local pid=$(cat $pid_file)
-    kill -9 $pid
+    if is_pid_exists $pid; then
+        kill -9 $pid
+        sleep 1
+    fi
 
     if is_pid_exists $pid; then
         echo "停止任务失败"
+    else
+        echo "停止成功"
+        rm -f $pid_file
     fi
 }
 
@@ -632,7 +649,7 @@ else
         print_line
         info_mtp
         print_line
-        echo -e "脚本源码：https://github.com/ellermister/mtproxy"
+        echo -e "脚本源码：https://github.com/DavidLeeMr/mtproxy"
         echo -e "配置文件: $WORKDIR/mtp_config"
         echo -e "卸载方式：直接删除当前目录下文件即可"
         echo "使用方式:"
@@ -642,4 +659,46 @@ else
         echo -e "\t重启服务\t bash $0 restart"
         echo -e "\t重新安装代理程序 bash $0 reinstall"
     fi
+fi
+
+create_systemd_service() {
+    echo "正在创建并启用 mtp.service systemd 服务..."
+
+    local SERVICE_FILE="/etc/systemd/system/mtp.service"
+    local SCRIPT_NAME=$(basename "$0")
+    local WORKDIR=$(dirname "$(readlink -f "$0")")
+
+    cat > "$SERVICE_FILE" <<EOF
+[Unit]
+Description=MTProxy TLS (自管理脚本)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$WORKDIR
+User=root
+ExecStart=/bin/bash $WORKDIR/$SCRIPT_NAME daemon
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # 重新加载 systemd 配置并启用服务
+    systemctl daemon-reload
+    systemctl enable --now mtp >/dev/null 2>&1
+
+    echo -e "\n已成功创建并启用 systemd 开机自启服务（mtp.service）"
+    echo -e "   服务启动方式: /bin/bash $WORKDIR/$SCRIPT_NAME daemon"
+    echo -e "   查看状态： systemctl status mtp"
+    echo -e "   查看日志： journalctl -u mtp -f"
+    echo -e "   手动更新服务： bash $SCRIPT_NAME systemd\n"
+}
+
+# 第一次安装、reinstall、或手动调用时自动创建/更新服务
+if [[ "$param" == "reinstall" ]] || [[ "$param" == "" ]] || [[ "$param" == "systemd" ]]; then
+    create_systemd_service
+    # 如果是手动调用 systemd，则直接退出
+    [[ "$param" == "systemd" ]] && exit 0
 fi
