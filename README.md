@@ -11,22 +11,6 @@
 
 > 此功能提供了 Docker 镜像以便开箱即用。
 
-## 交流群组
-
-Telegram 群组：<https://t.me/EllerHK>
-
-## 安装方式
-
-提供了两种安装方式可供选择：
-
-- 使用脚本
-
-  选择该方式一般是你在宿主机中进行直接安装或者编译，会或多或少需要安装一些系统基础依赖库。
-
-- 使用 Docker
-
-  **小白建议使用 Docker!** 不会对宿主机造成污染，如果你需要修改一些配置文件，需要你稍微学习一些基础 Docker 使用技术。
-
 ### 使用脚本
 
 > 如果你反复遇到错误或者其他未知问题, 建议更换为 Debian 9+ 以上的系统或采用 Docker 方式运行。
@@ -35,7 +19,7 @@ Telegram 群组：<https://t.me/EllerHK>
 
 ```bash
 rm -rf /home/mtproxy && mkdir /home/mtproxy && cd /home/mtproxy
-curl -fsSL -o mtproxy.sh https://github.com/ellermister/mtproxy/raw/master/mtproxy.sh
+curl -fsSL -o mtproxy.sh https://github.com/DavidLeeMr/mtproxy/raw/master/mtproxy.sh
 bash mtproxy.sh
 ```
 
