@@ -258,9 +258,13 @@ do_install() {
     if [[ "$mtg_provider" == "mtg" ]]; then
         # 下载 mtg
         local arch=$(get_architecture)
-        local mtg_url=https://github.com/9seconds/mtg/releases/download/v1.0.11/mtg-1.0.11-linux-$arch.tar.gz
-        wget $mtg_url -O mtg.tar.gz
-        tar -xzvf mtg.tar.gz mtg-1.0.11-linux-$arch/mtg --strip-components 1
+        if [ "amd64" != "$arch" ]; then
+            echo -e "[\033[33m提醒\033[0m] 你的系统架构不支持安装 mtg\n"
+            exit 1
+        fi
+        local mtg_url="https://github.com/ellermister/mtproxy/releases/download/v0.04/mtg"
+        wget $mtg_url -O mtg
+        chmod +x mtg
 
         [[ -f "./mtg" ]] && ./mtg && echo "Installed for mtg"
     else
