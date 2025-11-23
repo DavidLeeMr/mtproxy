@@ -1,5 +1,6 @@
 #!/bin/bash
 # MTProto一键安装脚本，兼容Telegram 12.2+
+# 支持：① alexbers Python 版（最强推荐）  ② 9seconds mtg  ③ Telegram 官方 C 版
 # Author: Mr.David<https://cceclubs.org> / Based on TelegramMessenger/MTProxy (fork from https://github.com/TelegramMessenger/MTProxy)
 # Features: 交互配置，默认值支持回车即用，兼容新版 Telegram (iOS 12.2+ / Desktop 6.3+)
 
