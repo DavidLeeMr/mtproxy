@@ -531,16 +531,16 @@ function get_run_command(){
 
     if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
         cat > ./bin/config.py <<EOF
-        PORT = ${port}
-        USERS = {"tg": "${secret}"}
-        MODES = {
-            "classic": False,
-            "secure": False,
-            "tls": True
-        }
-        TLS_DOMAIN = "${domain}"
-        AD_TAG = "${proxy_tag}"
-        EOF
+PORT = ${port}
+USERS = {"tg": "${secret}"}
+MODES = {
+    "classic": False,
+    "secure": False,
+    "tls": True
+}
+TLS_DOMAIN = "${domain}"
+AD_TAG = "${proxy_tag}"
+EOF
       #optimze pool
       sed -i 's/MAX_CONNS_IN_POOL = .*/MAX_CONNS_IN_POOL = 500/' ./bin/mtprotoproxy.py 2>/dev/null || true
       echo "python3 ./bin/mtprotoproxy.py ./bin/config.py"
