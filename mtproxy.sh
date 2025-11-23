@@ -1,5 +1,5 @@
 #!/bin/bash
-# MTProto 一键安装脚本（2025 最强三合一），兼容Telegram 12.2+
+# MTProxy Ultimate 2025 一键安装脚本（Python + mtg + 官方三合一）
 # 支持：① alexbers Python 版（最强推荐）  ② 9seconds mtg  ③ Telegram 官方 C 版
 # Author: Mr.David<https://cceclubs.org> / Based on TelegramMessenger/MTProxy (fork from https://github.com/TelegramMessenger/MTProxy)
 # Features: 交互配置，默认值支持回车即用，兼容新版 Telegram (iOS 12.2+ / Desktop 6.3+)
@@ -295,7 +295,7 @@ do_install() {
 
     if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
         # Python 版
-        echo -e "\033[32m正在安装 Python 版 mtprotoproxy...\033[0m"
+        echo -e "\033[32m正在安装 Python 版 MTProxy (alexbers)...\033[0m"
         mkdir -p ./bin
         wget -q https://github.com/alexbers/mtprotoproxy/archive/refs/heads/master.zip
         unzip -qo master.zip
@@ -305,7 +305,7 @@ do_install() {
 
     elif [[ "$mtg_provider" == "mtg" ]]; then
         # 下载 mtg
-        echo -e "\033[32m正在安装 golang 版 mtprotoproxy...\033[0m"
+        echo -e "\033[32m正在安装 golang 版 MTProxy (9seconds)...\033[0m"
         local arch=$(get_architecture)
         if [ "amd64" != "$arch" ]; then
             echo -e "[\033[33m提醒\033[0m] 你的系统架构不支持安装 mtg\n"
