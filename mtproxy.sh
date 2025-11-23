@@ -1,5 +1,6 @@
 #!/bin/bash
-# MTProto一键安装脚本，兼容Telegram 12.2+
+# MTProto 一键安装脚本（2025 最强三合一），兼容Telegram 12.2+
+# 支持：① alexbers Python 版（最强推荐）  ② 9seconds mtg  ③ Telegram 官方 C 版
 # Author: Mr.David<https://cceclubs.org> / Based on TelegramMessenger/MTProxy (fork from https://github.com/TelegramMessenger/MTProxy)
 # Features: 交互配置，默认值支持回车即用，兼容新版 Telegram (iOS 12.2+ / Desktop 6.3+)
 
@@ -57,9 +58,28 @@ function abs() {
 }
 
 function get_ip_public() {
-    public_ip=$(curl -s https://api.ip.sb/ip -A Mozilla --ipv4)
-    [ -z "$public_ip" ] && public_ip=$(curl -s ipinfo.io/ip -A Mozilla --ipv4)
-    echo $public_ip
+    local public_ip=""
+
+    # 尝试 Cloudflare trace API
+    if [ -z "$public_ip" ]; then
+        public_ip=$(curl -4 -s --connect-timeout 5 --max-time 10 https://1.1.1.1/cdn-cgi/trace -A Mozilla 2>/dev/null | grep "^ip=" | cut -d'=' -f2)
+    fi
+    
+    # 尝试 ip.sb API获取公网IP
+    if [ -z "$public_ip" ]; then
+        public_ip=$(curl -s --connect-timeout 5 --max-time 10 https://api.ip.sb/ip -A Mozilla --ipv4 2>/dev/null)
+    fi
+    
+    # 尝试 ipinfo.io API
+    if [ -z "$public_ip" ]; then
+        public_ip=$(curl -s --connect-timeout 5 --max-time 10 https://ipinfo.io/ip -A Mozilla --ipv4 2>/dev/null)
+    fi
+    
+    # 如果所有API都失败，退出
+    if [ -z "$public_ip" ]; then
+        print_error_exit "Failed to get public IP address. Please check your network connection."
+    fi
+    echo "$public_ip"
 }
 
 function get_ip_private() {
@@ -176,15 +196,17 @@ function get_mtg_provider() {
     source ./mtp_config
 
     local arch=$(get_architecture)
-    # 官方版本只支持 amd64，因此如果用户选了“2”，但系统不是 amd64，则自动切换到1
-    if [[ "$arch" != "amd64" && $provider -eq 2 ]]; then
+    # 官方版本只支持 amd64，因此如果用户选了“3”，但系统不是 amd64，则自动切换到1
+    if [[ "$arch" != "amd64" && $provider -eq 3 ]]; then
         provider=1
     fi
 
     if [ $provider -eq 1 ]; then
-        echo "mtg"
+        echo "python-mtprotoproxy"
     elif [ $provider -eq 2 ]; then
-        echo "mtproto-proxy"
+        echo "mtg"
+    elif [ $provider -eq 3 ]; then
+        echo "official-MTProxy"
     else
         echo "错误配置,请重新安装"
         exit 1
@@ -253,22 +275,50 @@ function is_pid_exists() {
 do_install() {
     cd $WORKDIR
 
+    # 【关键】选择 Python 版安装 Python 环境
+    if [[ "$(get_mtg_provider)" == "python-mtprotoproxy" ]]; then
+        echo -e "${GREEN}检测到选择 Python 版，正在按需安装 Python 环境...${PLAIN}"
+        if check_sys packageManager apt; then
+            apt update && apt install -y python3 python3-pip unzip git || exit 1
+        elif check_sys packageManager yum; then
+            yum install -y epel-release python3 python3-pip unzip git || exit 1
+        fi
+        # 安装 pyaes（必须）
+        pip3 install --quiet pyaes || python3 -m pip install --quiet pyaes || {
+            echo -e "${RED}错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
+            exit 1
+        }
+        command -v unzip >/dev/null || { echo -e "${RED}unzip 安装失败！${PLAIN}"; exit 1; }
+    fi
+
     mtg_provider=$(get_mtg_provider)
 
-    if [[ "$mtg_provider" == "mtg" ]]; then
+    if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
+        # Python 版
+        echo -e "\033[32m正在安装 Python 版 mtprotoproxy...\033[0m"
+        mkdir -p ./bin
+        wget -q https://github.com/alexbers/mtprotoproxy/archive/refs/heads/master.zip
+        unzip -qo master.zip
+        cp -rf mtprotoproxy-master/*.py mtprotoproxy-master/pyaes ./bin/
+        rm -rf master.zip mtprotoproxy-master
+        chmod +x ./bin/mtprotoproxy.py
+
+    elif [[ "$mtg_provider" == "mtg" ]]; then
         # 下载 mtg
+        echo -e "\033[32m正在安装 golang 版 mtprotoproxy...\033[0m"
         local arch=$(get_architecture)
         if [ "amd64" != "$arch" ]; then
             echo -e "[\033[33m提醒\033[0m] 你的系统架构不支持安装 mtg\n"
             exit 1
         fi
-        local mtg_url="https://github.com/ellermister/mtproxy/releases/download/v0.04/mtg"
+        local mtg_url="https://github.com/ellermister/mtproxy/releases/download/v0.04/$(uname -m)-mtg"
         wget $mtg_url -O mtg
         chmod +x mtg
 
         [[ -f "./mtg" ]] && ./mtg && echo "Installed for mtg"
-    else
+    elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
         # 官方版本
+        echo -e "\033[32m正在安装Telegram 官方版本 MTProxy...\033[0m"
         wget https://github.com/ellermister/mtproxy/releases/download/v0.04/mtproto-proxy -O mtproto-proxy -q
         chmod +x mtproto-proxy
     fi
@@ -281,6 +331,24 @@ do_install() {
 
 print_line() {
     echo -e "========================================="
+}
+print_error_exit() {
+    print_line
+    echo -e "[\033[95mERROR\033[0m] $1"
+    print_line
+    exit 1
+}
+
+print_warning() {
+    echo -e "[\033[33mWARNING\033[0m] $1"
+}
+
+print_info() {
+    echo -e "[\033[32mINFO\033[0m] $1"
+}
+
+print_subject() {
+    echo -e "\n\033[32m> $1\033[0m"
 }
 
 do_kill_process() {
@@ -310,7 +378,7 @@ do_check_system_datetime_and_update() {
 }
 
 do_install_basic_dep() {
-    echo -e "[\033[33m提醒\033[0m] 正在检测并安装基础依赖...\n"
+    echo -e "[\033[33m提醒\033[0m] 正在检测并安装通用基础依赖...\n"
     if check_sys packageManager yum; then
         yum update && yum install -y iproute curl wget procps-ng.x86_64 net-tools ntp
     elif check_sys packageManager apt; then
@@ -339,10 +407,15 @@ do_config_mtp() {
 
     while true; do
         default_provider=1
-        echo -e "请输入要安装的程序版本"
-        echo -e "1. 9seconds 第三方版本 (兼容性强，推荐)"
-        echo -e "2. Telegram 官方版本 (C语言，仅支持 x86_64，存在兼容问题)"
 
+        echo -e "请输入要安装的程序版本"
+        echo -e " \033[36m1.\033[0m mtprotoproxy (alexbers)"
+        echo -e " └─ Python 版本, 功能最全, 兼容性强"
+        echo -e " \033[36m2.\033[0m mtg (9seconds)"
+        echo -e " └─ Golang 版本, 兼容性强, 轻量极速"
+        echo -e " \033[36m3.\033[0m MTProxy (TelegramMessenger)"
+        echo -e " └─ Telegram 官方版本 (C语言，仅支持 x86_64，存在兼容问题)"
+        
         if ! is_supported_official_version; then
             echo -e "\n[\033[33m提醒\033[0m] 你的系统不支持官方版本\n"
         fi
@@ -351,7 +424,7 @@ do_config_mtp() {
         [ -z "${input_provider}" ] && input_provider=${default_provider}
         expr ${input_provider} + 1 &>/dev/null
         if [ $? -eq 0 ]; then
-            if [ ${input_provider} -ge 1 ] && [ ${input_provider} -le 2 ] && [ ${input_provider:0:1} != 0 ]; then
+            if [ ${input_provider} -ge 1 ] && [ ${input_provider} -le 3 ] && [ ${input_provider:0:1} != 0 ]; then
                 echo
                 echo "---------------------------"
                 echo "provider = ${input_provider}"
@@ -491,7 +564,24 @@ function get_run_command(){
   cd $WORKDIR
   mtg_provider=$(get_mtg_provider)
   source ./mtp_config
-  if [[ "$mtg_provider" == "mtg" ]]; then
+
+    if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
+        cat > ./bin/config.py <<EOF
+PORT = ${port}
+USERS = {"tg": "${secret}"}
+MODES = {
+    "classic": False,
+    "secure": False,
+    "tls": True
+}
+TLS_DOMAIN = "${domain}"
+AD_TAG = "${proxy_tag}"
+EOF
+      #optimze pool
+      sed -i 's/MAX_CONNS_IN_POOL = .*/MAX_CONNS_IN_POOL = 500/' ./bin/mtprotoproxy.py 2>/dev/null || true
+      echo "python3 ./bin/mtprotoproxy.py ./bin/config.py"
+
+  elif [[ "$mtg_provider" == "mtg" ]]; then
       domain_hex=$(str_to_hex $domain)
       client_secret="ee${secret}${domain_hex}"
       local local_ip=$(get_local_ip)
@@ -500,7 +590,7 @@ function get_run_command(){
       # ./mtg simple-run -n 1.1.1.1 -t 30s -a 512kib 0.0.0.0:$port $client_secret >/dev/null 2>&1 &
       [[ -f "./mtg" ]] || (echo -e "提醒：\033[33m MTProxy 代理程序不存在请重新安装! \033[0m" && exit 1)
       echo "./mtg run $client_secret $proxy_tag -b 0.0.0.0:$port --multiplex-per-connection 500 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
-  else
+  elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
       curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf
       curl -s https://core.telegram.org/getProxySecret -o proxy-secret
       nat_info=$(get_nat_ip_param)
@@ -508,6 +598,9 @@ function get_run_command(){
       tag_arg=""
       [[ -n "$proxy_tag" ]] && tag_arg="-P $proxy_tag"
       echo "./mtproto-proxy -u nobody -p $web_port -H $port -S $secret --aes-pwd proxy-secret proxy-multi.conf -M $workerman $tag_arg --domain $domain $nat_info --ipv6"
+  else
+      echo -e "[\033[33mWARNING\033[0m] Invalid configuration, please reinstall"
+      exit 1
   fi
 }
 
