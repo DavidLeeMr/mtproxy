@@ -293,7 +293,7 @@ do_install() {
             echo -e "[\033[33m提醒\033[0m] 你的系统架构不支持安装 mtg\n"
             exit 1
         fi
-        local mtg_url="https://github.com/ellermister/mtproxy/releases/download/v0.04/mtg"
+        local mtg_url="https://github.com/ellermister/mtproxy/releases/download/v0.04/$(uname -m)-mtg"
         wget $mtg_url -O mtg
         chmod +x mtg
 
