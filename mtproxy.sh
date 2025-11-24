@@ -1,6 +1,6 @@
 #!/bin/bash
-# MTProxy Ultimate 2025 一键安装脚本（Python + mtg + 官方三合一）
-# 支持：① alexbers Python 版（最强推荐）  ② 9seconds mtg  ③ Telegram 官方 C 版
+# MTProxy Ultimate 2025 一键安装脚本（mtg + Python + 官方三合一）
+# 支持：① 9seconds mtg  ② alexbers Python 版  ③ Telegram 官方 C 版
 # Author: Mr.David<https://cceclubs.org> / Based on TelegramMessenger/MTProxy (fork from https://github.com/TelegramMessenger/MTProxy)
 # Features: 交互配置，默认值支持回车即用，兼容新版 Telegram (iOS 12.2+ / Desktop 6.3+)
 
@@ -202,9 +202,9 @@ function get_mtg_provider() {
     fi
 
     if [ $provider -eq 1 ]; then
-        echo "python-mtprotoproxy"
-    elif [ $provider -eq 2 ]; then
         echo "mtg"
+    elif [ $provider -eq 2 ]; then
+        echo "python-mtprotoproxy"
     elif [ $provider -eq 3 ]; then
         echo "official-MTProxy"
     else
@@ -275,17 +275,7 @@ function is_pid_exists() {
 do_install_proxy() {
     local mtg_provider=$1
 
-    if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
-        # Python 版
-        echo -e "\033[32m正在安装 Python 版 MTProxy (alexbers)...\033[0m"
-        mkdir -p ./bin
-        wget -q https://github.com/alexbers/mtprotoproxy/archive/refs/heads/master.zip
-        unzip -qo master.zip
-        cp -rf mtprotoproxy-master/*.py mtprotoproxy-master/pyaes ./bin/
-        rm -rf master.zip mtprotoproxy-master
-        chmod +x ./bin/mtprotoproxy.py
-
-    elif [[ "$mtg_provider" == "mtg" ]]; then
+    if [[ "$mtg_provider" == "mtg" ]]; then
         # 下载 mtg
         echo -e "\033[32m正在安装 golang 版 MTProxy (9seconds)...\033[0m"
         local arch=$(get_architecture)
@@ -298,6 +288,17 @@ do_install_proxy() {
         chmod +x mtg
 
         [[ -f "./mtg" ]] && ./mtg && echo "Installed for mtg"
+
+    elif [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
+        # Python 版
+        echo -e "\033[32m正在安装 Python 版 MTProxy (alexbers)...\033[0m"
+        mkdir -p ./bin
+        wget -q https://github.com/alexbers/mtprotoproxy/archive/refs/heads/master.zip
+        unzip -qo master.zip
+        cp -rf mtprotoproxy-master/*.py mtprotoproxy-master/pyaes ./bin/
+        rm -rf master.zip mtprotoproxy-master
+        chmod +x ./bin/mtprotoproxy.py
+
     elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
         # 官方版本
         echo -e "\033[32m正在安装Telegram 官方版本 MTProxy...\033[0m"
@@ -317,7 +318,7 @@ do_install() {
         elif check_sys packageManager yum; then
             yum install -y epel-release python3 python3-pip unzip git || exit 1
         fi
-        
+
         # 兼容 pyaes 安装（完美支持 Debian 13+ / Ubuntu 25.04+）
         echo -e "${YELLOW}正在安装 pyaes 依赖（已适配 PEP 668）...${PLAIN}"
         pip3 install --break-system-packages --quiet pyaes 2>/dev/null || \
@@ -424,10 +425,10 @@ do_config_mtp() {
         default_provider=1
 
         echo -e "请输入要安装的程序版本"
-        echo -e " \033[36m1.\033[0m mtprotoproxy (alexbers)"
-        echo -e " └─ Python 版本, 功能最全, 兼容性强"
-        echo -e " \033[36m2.\033[0m mtg (9seconds)"
+        echo -e " \033[36m1.\033[0m mtg (9seconds)"
         echo -e " └─ Golang 版本, 兼容性强, 轻量极速"
+        echo -e " \033[36m2.\033[0m mtprotoproxy (alexbers)"
+        echo -e " └─ Python 版本, 功能最全, 兼容性强"
         echo -e " \033[36m3.\033[0m MTProxy (TelegramMessenger)"
         echo -e " └─ Telegram 官方版本 (C语言，仅支持 x86_64，存在兼容问题)"
         
@@ -579,8 +580,17 @@ function get_run_command(){
   cd $WORKDIR
   mtg_provider=$(get_mtg_provider)
   source ./mtp_config
+    if [[ "$mtg_provider" == "mtg" ]]; then
+        domain_hex=$(str_to_hex $domain)
+        client_secret="ee${secret}${domain_hex}"
+        local local_ip=$(get_local_ip)
+        public_ip=$(get_ip_public)
 
-    if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
+        # ./mtg simple-run -n 1.1.1.1 -t 30s -a 512kib 0.0.0.0:$port $client_secret >/dev/null 2>&1 &
+        [[ -f "./mtg" ]] || (echo -e "提醒：\033[33m MTProxy 代理程序不存在请重新安装! \033[0m" && exit 1)
+        echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 500 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
+
+    elif [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
         cat > ./bin/config.py <<EOF
 PORT = ${port}
 USERS = {"tg": "${secret}"}
@@ -596,16 +606,7 @@ EOF
       sed -i 's/MAX_CONNS_IN_POOL = .*/MAX_CONNS_IN_POOL = 500/' ./bin/mtprotoproxy.py 2>/dev/null || true
       echo "python3 ./bin/mtprotoproxy.py ./bin/config.py"
 
-  elif [[ "$mtg_provider" == "mtg" ]]; then
-      domain_hex=$(str_to_hex $domain)
-      client_secret="ee${secret}${domain_hex}"
-      local local_ip=$(get_local_ip)
-      public_ip=$(get_ip_public)
-      
-      # ./mtg simple-run -n 1.1.1.1 -t 30s -a 512kib 0.0.0.0:$port $client_secret >/dev/null 2>&1 &
-      [[ -f "./mtg" ]] || (echo -e "提醒：\033[33m MTProxy 代理程序不存在请重新安装! \033[0m" && exit 1)
-      echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 500 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
-  elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
+    elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
       curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf
       curl -s https://core.telegram.org/getProxySecret -o proxy-secret
       nat_info=$(get_nat_ip_param)
@@ -753,8 +754,8 @@ elif [[ "build" == $param ]]; then
     
     # build_mtproto 2
     # Python 版全架构都支持
-    do_install_proxy "python-mtprotoproxy"
     do_install_proxy "mtg"
+    do_install_proxy "python-mtprotoproxy"
 else
     if ! is_installed; then
         echo "MTProxyTLS一键安装运行绿色脚本"
