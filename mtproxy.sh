@@ -317,11 +317,20 @@ do_install() {
         elif check_sys packageManager yum; then
             yum install -y epel-release python3 python3-pip unzip git || exit 1
         fi
-        # 安装 pyaes（必须）
-        pip3 install --quiet pyaes || python3 -m pip install --quiet pyaes || {
-            echo -e "${RED}错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
+        
+        # 兼容 pyaes 安装（完美支持 Debian 13+ / Ubuntu 25.04+）
+        echo -e "${YELLOW}正在安装 pyaes 依赖（已适配 PEP 668）...${PLAIN}"
+        pip3 install --break-system-packages --quiet pyaes 2>/dev/null || \
+        python3 -m pip install --break-system-packages --quiet pyaes 2>/dev/null || \
+        echo -e "${RED}警告：pyaes 安装失败，但尝试继续运行（部分系统可能仍可工作）${PLAIN}"
+
+        # 最终检测是否真的可用
+        python3 -c "import pyaes" >/dev/null 2>&1 || {
+            echo -e "${RED}严重错误：pyaes 依赖缺失，Python 版 MTProxy 无法运行！${PLAIN}"
+            echo -e "${YELLOW}请手动执行：pip3 install --break-system-packages pyaes${PLAIN}"
             exit 1
         }
+
         command -v unzip >/dev/null || { echo -e "${RED}unzip 安装失败！${PLAIN}"; exit 1; }
     fi
 
