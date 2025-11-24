@@ -599,7 +599,7 @@ PORT = ${port}
 USERS = {"tg": "${secret}"}
 MODES = {
     "classic": False,
-    "secure": False,
+    "secure": True,
     "tls": True
 }
 TLS_DOMAIN = "${domain}"
