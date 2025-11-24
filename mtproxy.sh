@@ -272,26 +272,8 @@ function is_pid_exists() {
     fi
 }
 
-do_install() {
-    cd $WORKDIR
-
-    # 【关键】选择 Python 版安装 Python 环境
-    if [[ "$(get_mtg_provider)" == "python-mtprotoproxy" ]]; then
-        echo -e "${GREEN}检测到选择 Python 版，正在按需安装 Python 环境...${PLAIN}"
-        if check_sys packageManager apt; then
-            apt update && apt install -y python3 python3-pip unzip git || exit 1
-        elif check_sys packageManager yum; then
-            yum install -y epel-release python3 python3-pip unzip git || exit 1
-        fi
-        # 安装 pyaes（必须）
-        pip3 install --quiet pyaes || python3 -m pip install --quiet pyaes || {
-            echo -e "${RED}错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
-            exit 1
-        }
-        command -v unzip >/dev/null || { echo -e "${RED}unzip 安装失败！${PLAIN}"; exit 1; }
-    fi
-
-    mtg_provider=$(get_mtg_provider)
+do_install_proxy() {
+    local mtg_provider=$1
 
     if [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
         # Python 版
@@ -322,7 +304,31 @@ do_install() {
         wget https://github.com/ellermister/mtproxy/releases/download/v0.04/mtproto-proxy -O mtproto-proxy -q
         chmod +x mtproto-proxy
     fi
+}
 
+do_install() {
+    cd $WORKDIR
+
+    # 【关键】选择 Python 版安装 Python 环境
+    if [[ "$(get_mtg_provider)" == "python-mtprotoproxy" ]]; then
+        echo -e "${GREEN}检测到选择 Python 版，正在按需安装 Python 环境...${PLAIN}"
+        if check_sys packageManager apt; then
+            apt update && apt install -y python3 python3-pip unzip git || exit 1
+        elif check_sys packageManager yum; then
+            yum install -y epel-release python3 python3-pip unzip git || exit 1
+        fi
+        # 安装 pyaes（必须）
+        pip3 install --quiet pyaes || python3 -m pip install --quiet pyaes || {
+            echo -e "${RED}错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
+            exit 1
+        }
+        command -v unzip >/dev/null || { echo -e "${RED}unzip 安装失败！${PLAIN}"; exit 1; }
+    fi
+
+    mtg_provider=$(get_mtg_provider)
+
+    do_install_proxy $mtg_provider
+    
     if [ ! -d "./pid" ]; then
         mkdir "./pid"
     fi
@@ -524,7 +530,7 @@ secret="${secret}"
 port=${input_port}
 web_port=${input_manage_port}
 domain="${input_domain}"
-proxy_tag="${input_tag}"
+adtag="${input_tag}"
 provider=${input_provider}
 EOF
     echo -e "配置已经生成完毕!"
@@ -575,7 +581,7 @@ MODES = {
     "tls": True
 }
 TLS_DOMAIN = "${domain}"
-AD_TAG = "${proxy_tag}"
+AD_TAG = "${adtag}"
 EOF
       #optimze pool
       sed -i 's/MAX_CONNS_IN_POOL = .*/MAX_CONNS_IN_POOL = 500/' ./bin/mtprotoproxy.py 2>/dev/null || true
@@ -589,14 +595,14 @@ EOF
       
       # ./mtg simple-run -n 1.1.1.1 -t 30s -a 512kib 0.0.0.0:$port $client_secret >/dev/null 2>&1 &
       [[ -f "./mtg" ]] || (echo -e "提醒：\033[33m MTProxy 代理程序不存在请重新安装! \033[0m" && exit 1)
-      echo "./mtg run $client_secret $proxy_tag -b 0.0.0.0:$port --multiplex-per-connection 500 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
+      echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 500 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
   elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
       curl -s https://core.telegram.org/getProxyConfig -o proxy-multi.conf
       curl -s https://core.telegram.org/getProxySecret -o proxy-secret
       nat_info=$(get_nat_ip_param)
       workerman=$(get_cpu_core)
       tag_arg=""
-      [[ -n "$proxy_tag" ]] && tag_arg="-P $proxy_tag"
+      [[ -n "$adtag" ]] && tag_arg="-P $adtag"
       echo "./mtproto-proxy -u nobody -p $web_port -H $port -S $secret --aes-pwd proxy-secret proxy-multi.conf -M $workerman $tag_arg --domain $domain $nat_info --ipv6"
   else
       echo -e "[\033[33mWARNING\033[0m] Invalid configuration, please reinstall"
@@ -725,16 +731,21 @@ elif [[ "debug" == $param ]]; then
 elif [[ "restart" == $param ]]; then
     stop_mtp
     run_mtp
-    debug_mtp
 elif [[ "reinstall" == $param ]]; then
     reinstall_mtp
 elif [[ "build" == $param ]]; then
+    echo -e "\033[34m进入源码/预编译混合安装模式（开发者专用）\033[0m"
     arch=$(get_architecture)
     if [[ "$arch" == "amd64" ]]; then
-        build_mtproto 1
+        # build_mtproto 1
+        # official 只在 amd64 上编译
+        do_install_proxy "official-MTProxy"
     fi
     
-     build_mtproto 2
+    # build_mtproto 2
+    # Python 版全架构都支持
+    do_install_proxy "python-mtprotoproxy"
+    do_install_proxy "mtg"
 else
     if ! is_installed; then
         echo "MTProxyTLS一键安装运行绿色脚本"
