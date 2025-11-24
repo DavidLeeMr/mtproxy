@@ -8,6 +8,10 @@ WORKDIR=$(dirname $(readlink -f $0))
 cd $WORKDIR
 pid_file=$WORKDIR/pid/pid_mtproxy
 
+URL_MTG="https://github.com/ellermister/mtproxy/releases/download/v0.04/$(uname -m)-mtg"
+URL_MTPROTO="https://github.com/ellermister/mtproxy/releases/download/v0.04/mtproto-proxy"
+URL_PY_MTPROTOPROXY="https://github.com/alexbers/mtprotoproxy/archive/refs/heads/master.zip"
+
 check_sys() {
     local checkType=$1
     local value=$2
@@ -181,7 +185,6 @@ function build_mtproto() {
 
         cp -f mtproto-proxy $WORKDIR
         
-
         # clean
         rm -rf 'MTProxy'
     fi
@@ -278,13 +281,7 @@ do_install_proxy() {
     if [[ "$mtg_provider" == "mtg" ]]; then
         # 下载 mtg
         echo -e "\033[32m正在安装 golang 版 MTProxy (9seconds)...\033[0m"
-        local arch=$(get_architecture)
-        if [ "amd64" != "$arch" ]; then
-            echo -e "[\033[33m提醒\033[0m] 你的系统架构不支持安装 mtg\n"
-            exit 1
-        fi
-        local mtg_url="https://github.com/ellermister/mtproxy/releases/download/v0.04/$(uname -m)-mtg"
-        wget $mtg_url -O mtg
+        wget $URL_MTG -O mtg
         chmod +x mtg
 
         [[ -f "./mtg" ]] && ./mtg && echo "Installed for mtg"
@@ -293,16 +290,22 @@ do_install_proxy() {
         # Python 版
         echo -e "\033[32m正在安装 Python 版 MTProxy (alexbers)...\033[0m"
         mkdir -p ./bin
-        wget -q https://github.com/alexbers/mtprotoproxy/archive/refs/heads/master.zip
-        unzip -qo master.zip
+        wget $URL_PY_MTPROTOPROXY -O mtprotoproxy-master.zip
+        unzip mtprotoproxy-master.zip
         cp -rf mtprotoproxy-master/*.py mtprotoproxy-master/pyaes ./bin/
-        rm -rf master.zip mtprotoproxy-master
+        rm -rf mtprotoproxy-master mtprotoproxy-master.zip
         chmod +x ./bin/mtprotoproxy.py
 
     elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
         # 官方版本
+        # 官方 C 版只支持 amd64！
+        if [[ "$(uname -m)" != "x86_64" ]]; then
+            echo -e "\033[31m官方 C 版 MTProxy 仅支持 x86_64 架构，您的架构 $(uname -m) 不支持\033[0m"
+            exit 1
+        fi
+
         echo -e "\033[32m正在安装Telegram 官方版本 MTProxy...\033[0m"
-        wget https://github.com/ellermister/mtproxy/releases/download/v0.04/mtproto-proxy -O mtproto-proxy -q
+        wget $URL_MTPROTO -O mtproto-proxy -q
         chmod +x mtproto-proxy
     fi
 }
@@ -745,15 +748,14 @@ elif [[ "reinstall" == $param ]]; then
     reinstall_mtp
 elif [[ "build" == $param ]]; then
     echo -e "\033[34m进入源码/预编译混合安装模式（开发者专用）\033[0m"
-    arch=$(get_architecture)
-    if [[ "$arch" == "amd64" ]]; then
+    if [[ "$(get_architecture)" == "amd64" ]]; then
         # build_mtproto 1
         # official 只在 amd64 上编译
         do_install_proxy "official-MTProxy"
     fi
     
     # build_mtproto 2
-    # Python 版全架构都支持
+    # mtg 和 Python 版全架构都支持
     do_install_proxy "mtg"
     do_install_proxy "python-mtprotoproxy"
 else
