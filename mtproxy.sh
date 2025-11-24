@@ -496,7 +496,7 @@ do_config_mtp() {
 
     # domain
     while true; do
-        default_domain="update.microsoft.com"
+        default_domain="azure.microsoft.com"
         echo -e "请输入一个需要伪装的域名："
         read -p "(默认域名: ${default_domain}):" input_domain
         [ -z "${input_domain}" ] && input_domain=${default_domain}
@@ -591,7 +591,7 @@ function get_run_command(){
 
         # ./mtg simple-run -n 1.1.1.1 -t 30s -a 512kib 0.0.0.0:$port $client_secret >/dev/null 2>&1 &
         [[ -f "./mtg" ]] || (echo -e "提醒：\033[33m MTProxy 代理程序不存在请重新安装! \033[0m" && exit 1)
-        echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 500 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
+        echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 32 --prefer-ip=ipv4 -t $local_ip:$web_port" -4 "$public_ip:$port"
 
     elif [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
         cat > ./bin/config.py <<EOF
@@ -606,7 +606,7 @@ TLS_DOMAIN = "${domain}"
 AD_TAG = "${adtag}"
 EOF
       #optimze pool
-      sed -i 's/MAX_CONNS_IN_POOL = .*/MAX_CONNS_IN_POOL = 500/' ./bin/mtprotoproxy.py 2>/dev/null || true
+      sed -i 's/MAX_CONNS_IN_POOL = .*/MAX_CONNS_IN_POOL = 0/' ./bin/mtprotoproxy.py 2>/dev/null || true
       echo "python3 ./bin/mtprotoproxy.py ./bin/config.py"
 
     elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
