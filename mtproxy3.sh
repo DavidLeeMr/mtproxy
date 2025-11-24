@@ -590,7 +590,7 @@ TLS_DOMAIN = "${domain}"
 AD_TAG = "${adtag}"
 EOF
       #optimze pool
-      sed -i 's/MAX_CONNS_IN_POOL =\s[0-9]\+/MAX_CONNS_IN_POOL = 500/' "$BINARY_PY_MTPROTOPROXY_PATH"
+      sed -i 's/MAX_CONNS_IN_POOL =\s[0-9]\+/MAX_CONNS_IN_POOL = 0/' "$BINARY_PY_MTPROTOPROXY_PATH"
       
       echo "$SYSTEM_PYTHON $BINARY_PY_MTPROTOPROXY_PATH $WORKDIR/bin/config.py"
   elif [[ "$mtg_provider" == "official-MTProxy" ]]; then
