@@ -591,7 +591,7 @@ function get_run_command(){
 
         # ./mtg simple-run -n 1.1.1.1 -t 30s -a 512kib 0.0.0.0:$port $client_secret >/dev/null 2>&1 &
         [[ -f "./mtg" ]] || (echo -e "提醒：\033[33m MTProxy 代理程序不存在请重新安装! \033[0m" && exit 1)
-        echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 32 --secure --prefer-ip=ipv4 --stats-period=5m -t $local_ip:$web_port" -4 "$public_ip:$port"
+        echo "./mtg run $client_secret $adtag -b 0.0.0.0:$port --multiplex-per-connection 32 --prefer-ip=ipv4 --stats-period=5m -t $local_ip:$web_port" -4 "$public_ip:$port"
 
     elif [[ "$mtg_provider" == "python-mtprotoproxy" ]]; then
         cat > ./bin/config.py <<EOF
