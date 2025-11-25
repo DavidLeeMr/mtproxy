@@ -616,7 +616,7 @@ EOF
       workerman=$(get_cpu_core)
       tag_arg=""
       [[ -n "$adtag" ]] && tag_arg="-P $adtag"
-      echo "./mtproto-proxy -u nobody -p $web_port -H $port -S $secret --aes-pwd=proxy-secret --aes-pwd=proxy-multi.conf -M $workerman $tag_arg --domain $domain $nat_info --ipv6"
+      echo "./mtproto-proxy -u nobody -p $web_port -H $port -S $secret --aes-pwd proxy-secret proxy-multi.conf -M $workerman $tag_arg --domain $domain $nat_info --ipv6"
   else
       echo -e "[\033[33mWARNING\033[0m] Invalid configuration, please reinstall"
       exit 1
