@@ -322,18 +322,26 @@ do_install() {
             yum install -y epel-release python3 python3-pip unzip git || exit 1
         fi
 
-        # 兼容 pyaes 安装（完美支持 Debian 13+ / Ubuntu 25.04+）
-        echo -e "${YELLOW}正在安装 pyaes 依赖（已适配 PEP 668）...${PLAIN}"
-        pip3 install --break-system-packages --quiet pyaes 2>/dev/null || \
-        python3 -m pip install --break-system-packages --quiet pyaes 2>/dev/null || \
-        echo -e "${RED}警告：pyaes 安装失败，但尝试继续运行（部分系统可能仍可工作）${PLAIN}"
-
-        # 最终检测是否真的可用
-        python3 -c "import pyaes" >/dev/null 2>&1 || {
-            echo -e "${RED}严重错误：pyaes 依赖缺失，Python 版 MTProxy 无法运行！${PLAIN}"
-            echo -e "${YELLOW}请手动执行：pip3 install --break-system-packages pyaes${PLAIN}"
+        # 兼容 pyaes 安装（完美支持 Ubuntu 20.04/22.04/24.04 + Debian 12/13）
+        echo -e "${YELLOW}正在安装 pyaes 依赖（完美兼容所有系统）...${PLAIN}"
+        
+        # 方法1：尝试用系统自带的 pip（Ubuntu 22.04 以下）
+        pip3 install --quiet pyaes 2>/dev/null && echo "pyaes 已成功安装" && python3 -c "import pyaes" >/dev/null 2>&1 && exit 0
+        # 方法2：强制用 python -m pip（绕过系统 pip 限制）
+        python3 -m pip install --quiet pyaes 2>/dev/null && echo "pyaes 已成功安装（方法2）"
+        # 方法3：最暴力突破 PEP 668（Ubuntu 22.04 必杀）
+        python3 -m pip install --quiet --break-system-packages pyaes 2>/dev/null || \
+        pip3 install --quiet --break-system-packages pyaes 2>/dev/null || true
+        
+        # 最终检测是否真的能 import
+        if ! python3 -c "import pyaes" >/dev/null 2>&1; then
+            echo -e "${RED}致命错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
+            echo -e "${YELLOW}请手动执行以下命令之一：${PLAIN}"
+            echo "  python3 -m pip install --break-system-packages pyaes"
+            echo "  或升级 pip：python3 -m pip install --upgrade pip"
             exit 1
-        }
+        fi
+        echo -e "${GREEN}pyaes 依赖安装成功！${PLAIN}"
 
         command -v unzip >/dev/null || { echo -e "${RED}unzip 安装失败！${PLAIN}"; exit 1; }
     fi
