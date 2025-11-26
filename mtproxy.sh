@@ -451,18 +451,44 @@ do_check_system_datetime_and_update() {
 }
 
 do_install_basic_dep() {
-    echo -e "[\033[33m提醒\033[0m] 正在检测并安装通用基础依赖...\n"
-    if check_sys packageManager yum; then
-        yum update && yum install -y iproute curl wget procps-ng.x86_64 net-tools ntp
-    elif check_sys packageManager apt; then
-        apt update
-        # 先安装必需的包
-        apt install -y iproute2 curl wget procps net-tools || true
-        # 尝试安装时间同步工具（可选，允许失败）
-        apt install -y ntpsec-ntpdate 2>/dev/null || apt install -y ntpdate 2>/dev/null || true
+    echo -e "${YELLOW}正在智能检查通用基础依赖（已安装将自动跳过）...${PLAIN}"
+
+    local missing=""
+
+    if check_sys packageManager apt; then
+        # 检查必需工具
+        for pkg in curl wget procps net-tools iproute2; do
+            dpkg -s "$pkg" >/dev/null 2>&1 || missing="$missing $pkg"
+        done
+
+        # 时间同步工具（ntpdate 或 sntp，二选一即可）
+        if ! command -v ntpdate >/dev/null 2>&1 && ! command -v sntp >/dev/null 2>&1; then
+            # 优先装 ntpdate，失败再降级装旧版 ntpdate
+            missing="$missing ntpdate"
+        fi
+
+        if [[ -n "$missing" ]]; then
+            echo -e "${YELLOW}检测到缺失包：${missing// /, }，正在安装...${PLAIN}"
+            apt update -qq
+            apt install -y $missing || true
+            echo -e "${GREEN}通用基础依赖安装完成${PLAIN}"
+        else
+            echo -e "${GREEN}所有通用基础依赖已就绪，直接跳过${PLAIN}"
+        fi
+
+    elif check_sys packageManager yum; then
+        for pkg in curl wget procps-ng net-tools iproute ntp; do
+            rpm -q "$pkg" >/dev/null 2>&1 || missing="$missing $pkg"
+        done
+
+        if [[ -n "$missing" ]]; then
+            echo -e "${YELLOW}检测到缺失包：${missing// /, }，正在安装...${PLAIN}"
+            yum install -y $missing || true
+            echo -e "${GREEN}通用基础依赖安装完成${PLAIN}"
+        else
+            echo -e "${GREEN}所有通用基础依赖已就绪，直接跳过${PLAIN}"
+        fi
     fi
-    
-    return 0
 }
 
 do_install_build_dep() {
