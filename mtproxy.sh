@@ -313,46 +313,81 @@ do_install_proxy() {
 do_install() {
     cd $WORKDIR
 
-    # 【关键】选择 Python 版安装 Python 环境
+    # 【关键】选择 Python 版才检查/安装 Python 环境
     if [[ "$(get_mtg_provider)" == "python-mtprotoproxy" ]]; then
-        echo -e "${GREEN}检测到选择 Python 版，正在按需安装 Python 环境...${PLAIN}"
-        if check_sys packageManager apt; then
-            apt update && apt install -y python3 python3-pip unzip git || exit 1
-        elif check_sys packageManager yum; then
-            yum install -y epel-release python3 python3-pip unzip git || exit 1
+        echo -e "${GREEN}检测到选择 Python 版，正在智能检查 Python 环境...${PLAIN}"
+
+        # 1. 检查是否已有 python3 和 pip3
+        if command -v python3 >/dev/null && command -v pip3 >/dev/null; then
+            echo -e "${GREEN}✓ python3 和 pip3 已存在，跳过安装${PLAIN}"
+        else
+            echo -e "${YELLOW}✗ python3 或 pip3 缺失，正在安装...${PLAIN}"
+            if check_sys packageManager apt; then
+                apt update && apt install -y python3 python3-pip || exit 1
+            elif check_sys packageManager yum; then
+                yum install -y epel-release python3 python3-pip || exit 1
+            fi
+        fi
+        
+        # 2. 检查 unzip（下载 zip 必须）
+        if command -v unzip >/dev/null; then
+            echo -e "${GREEN}✓ unzip 已存在，跳过安装${PLAIN}"
+        else
+            echo -e "${YELLOW}✗ unzip 缺失，正在安装...${PLAIN}"
+            if check_sys packageManager apt; then
+                apt install -y unzip || exit 1
+            elif check_sys packageManager yum; then
+                yum install -y unzip || exit 1
+            fi
+        fi
+
+        # 3. 智能升级 pip（避免太老的 pip 装不了 pyaes）（防御性写法，防止 pip3 命令不存在）
+        if command -v pip3 >/dev/null 2>&1; then
+            CURRENT_PIP=$(pip3 --version 2>/dev/null | awk '{print $2}' | cut -d. -f1-2)
+            if [[ -n "$CURRENT_PIP" ]] && [[ $(echo "$CURRENT_PIP < 20.3" | bc -l 2>/dev/null || echo "1") -eq 1 ]]; then
+                echo -e "${YELLOW}pip 版本过低（$CURRENT_PIP），正在自动升级...${PLAIN}"
+                python3 -m pip install --upgrade pip --quiet >/dev/null 2>&1 || true
+            fi
+        else
+            echo -e "${YELLOW}pip3 命令异常，跳过版本检查（后面会强制用 python -m pip）${PLAIN}"
         fi
 
         # 兼容 pyaes 安装（完美支持 Ubuntu 20.04/22.04/24.04 + Debian 12/13）
-        echo -e "${YELLOW}正在安装 pyaes 依赖（完美兼容所有系统）...${PLAIN}"
+        echo -e "${YELLOW}正在检查 pyaes 依赖（已安装将自动跳过）...${PLAIN}"
         
-        # 方法1：尝试用系统自带的 pip（Ubuntu 22.04 以下）
-        if pip3 install --quiet pyaes 2>/dev/null; then
-            echo -e "${GREEN}pyaes 已成功安装（方法1）${PLAIN}"
-        # 方法2：强制用 python -m pip（绕过系统 pip 限制）
-        elif python3 -m pip install --quiet pyaes 2>/dev/null; then
-            echo -e "${GREEN}pyaes 已成功安装（方法2）${PLAIN}"
+        if python3 -c "import pyaes" >/dev/null 2>&1; then
+            echo -e "${GREEN}pyaes 已经存在，直接跳过安装${PLAIN}"
         else
-        # 方法3：最暴力突破 PEP 668（Ubuntu 22.04 必杀）
-            python3 -m pip install --quiet --break-system-packages pyaes 2>/dev/null || \
-            pip3 install --quiet --break-system-packages pyaes 2>/dev/null || true
-            echo -e "${YELLOW}pyaes 已通过强制方式安装（方法3）${PLAIN}"
-        fi
-        
-        # 最终检测是否真的能 import
-        if ! python3 -c "import pyaes" >/dev/null 2>&1; then
-            echo -e "${RED}致命错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
-            echo -e "${YELLOW}请手动执行以下命令之一：${PLAIN}"
-            echo "  python3 -m pip install --break-system-packages pyaes"
-            echo "  或升级 pip：python3 -m pip install --upgrade pip"
-            exit 1
-        fi
-        echo -e "${GREEN}pyaes 依赖安装成功！${PLAIN}"
+            echo -e "${YELLOW}pyaes 未安装，正在智能安装（兼容所有系统）...${PLAIN}"
+            
+            # 方法1：尝试用系统自带的 pip（Ubuntu 22.04 以下）
+            if pip3 install --quiet pyaes 2>/dev/null; then
+                echo -e "${GREEN}pyaes 安装成功（方法1：系统 pip）${PLAIN}"
+            # 方法2：强制用 python -m pip（绕过系统 pip 限制）
+            elif python3 -m pip install --quiet pyaes 2>/dev/null; then
+                echo -e "${GREEN}pyaes 安装成功（方法2：python -m pip）${PLAIN}"
+            else
+                # 最终核弹：强制突破 PEP 668
+                python3 -m pip install --quiet --break-system-packages pyaes 2>/dev/null || \
+                pip3 install --quiet --break-system-packages pyaes 2>/dev/null || true
+                echo -e "${GREEN}pyaes 安装成功（方法3：强制安装）${PLAIN}"
+            fi
 
-        command -v unzip >/dev/null || { echo -e "${RED}unzip 安装失败！${PLAIN}"; exit 1; }
+            # 最终检测是否真的能 import
+            if python3 -c "import pyaes" >/dev/null 2>&1; then
+                echo -e "${GREEN}pyaes 依赖准备就绪！${PLAIN}"
+            else
+                echo -e "${RED}致命错误：pyaes 安装失败，Python 版无法运行！${PLAIN}"
+                echo -e "${YELLOW}请手动执行以下命令之一：${PLAIN}"
+                echo "  python3 -m pip install --break-system-packages pyaes"
+                echo "  或升级 pip：python3 -m pip install --upgrade pip"
+                exit 1
+            fi
+        fi
     fi
 
+    # 安装代理本体
     mtg_provider=$(get_mtg_provider)
-
     do_install_proxy $mtg_provider
     
     if [ ! -d "./pid" ]; then
@@ -420,7 +455,7 @@ do_install_basic_dep() {
         # 尝试安装时间同步工具（可选，允许失败）
         apt install -y ntpsec-ntpdate 2>/dev/null || apt install -y ntpdate 2>/dev/null || true
     fi
-
+    
     return 0
 }
 
