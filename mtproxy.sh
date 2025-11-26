@@ -326,12 +326,17 @@ do_install() {
         echo -e "${YELLOW}正在安装 pyaes 依赖（完美兼容所有系统）...${PLAIN}"
         
         # 方法1：尝试用系统自带的 pip（Ubuntu 22.04 以下）
-        pip3 install --quiet pyaes 2>/dev/null && echo "pyaes 已成功安装" && python3 -c "import pyaes" >/dev/null 2>&1 && exit 0
+        if pip3 install --quiet pyaes 2>/dev/null; then
+            echo -e "${GREEN}pyaes 已成功安装（方法1）${PLAIN}"
         # 方法2：强制用 python -m pip（绕过系统 pip 限制）
-        python3 -m pip install --quiet pyaes 2>/dev/null && echo "pyaes 已成功安装（方法2）"
+        elif python3 -m pip install --quiet pyaes 2>/dev/null; then
+            echo -e "${GREEN}pyaes 已成功安装（方法2）${PLAIN}"
+        else
         # 方法3：最暴力突破 PEP 668（Ubuntu 22.04 必杀）
-        python3 -m pip install --quiet --break-system-packages pyaes 2>/dev/null || \
-        pip3 install --quiet --break-system-packages pyaes 2>/dev/null || true
+            python3 -m pip install --quiet --break-system-packages pyaes 2>/dev/null || \
+            pip3 install --quiet --break-system-packages pyaes 2>/dev/null || true
+            echo -e "${YELLOW}pyaes 已通过强制方式安装（方法3）${PLAIN}"
+        fi
         
         # 最终检测是否真的能 import
         if ! python3 -c "import pyaes" >/dev/null 2>&1; then
