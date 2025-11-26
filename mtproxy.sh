@@ -343,15 +343,21 @@ do_install() {
 
         # 3. 智能升级 pip（避免太老的 pip 装不了 pyaes）（防御性写法，防止 pip3 命令不存在）
         if command -v pip3 >/dev/null 2>&1; then
-            CURRENT_PIP=$(pip3 --version 2>/dev/null | awk '{print $2}' | cut -d. -f1-2)
-            if [[ -n "$CURRENT_PIP" ]] && [[ $(echo "$CURRENT_PIP < 20.3" | bc -l 2>/dev/null || echo "1") -eq 1 ]]; then
-                echo -e "${YELLOW}pip 版本过低（$CURRENT_PIP），正在自动升级...${PLAIN}"
-                python3 -m pip install --upgrade pip --quiet >/dev/null 2>&1 || true
+            CURRENT_PIP=$(pip3 --version 2>/dev/null | awk '{print $2}' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+            if [[ -n "$CURRENT_PIP" ]]; then
+                if printf '%s\n' "20.3" "$CURRENT_PIP" | sort -V | head -n1 | grep -q "20.3"; then
+                    # 说明 20.3 更小或相等 → 当前版本 >= 20.3 → 不升级
+                    echo -e "${GREEN}pip 版本良好（$CURRENT_PIP），无需升级${PLAIN}"
+                else
+                    # 当前版本 < 20.3 → 才升级
+                    echo -e "${YELLOW}pip 版本过低（$CURRENT_PIP），正在自动升级到最新版...${PLAIN}"
+                    python3 -m pip install --upgrade pip --quiet >/dev/null 2>&1 || true
+                fi
             fi
         else
             echo -e "${YELLOW}pip3 命令异常，跳过版本检查（后面会强制用 python -m pip）${PLAIN}"
         fi
-
+        
         # 兼容 pyaes 安装（完美支持 Ubuntu 20.04/22.04/24.04 + Debian 12/13）
         echo -e "${YELLOW}正在检查 pyaes 依赖（已安装将自动跳过）...${PLAIN}"
         
